@@ -1,0 +1,270 @@
+{
+  "form_settings": {
+    "form_url": "",
+    "num_submissions": 10,
+    "delay_between_submissions": 2.0,
+    "randomize_delay": true,
+    "delay_variance": 0.5
+  },
+  "data_templates": {
+    "names": [
+      "Nguyễn Văn A",
+      "Trần Thị B",
+      "Lê Văn C",
+      "Phạm Thị D",
+      "Hoàng Văn E",
+      "Vũ Thị F",
+      "Đỗ Văn G",
+      "Bùi Thị H"
+    ],
+    "emails": [
+      "user1@example.com",
+      "user2@example.com",
+      "user3@example.com",
+      "user4@example.com",
+      "user5@example.com"
+    ],
+    "comments": [
+      "Rất hài lòng với dịch vụ!",
+      "Cần cải thiện thêm một số điểm.",
+      "Tuyệt vời, sẽ giới thiệu cho bạn bè.",
+      "Ổn, nhưng có thể tốt hơn.",
+      "Rất tốt, cảm ơn!"
+    ]
+  },
+  "field_config": {
+    "comment": "Cấu hình cho từng câu hỏi: fixed (cố định) hoặc random (ngẫu nhiên)",
+    "instructions": {
+      "mode": "fixed = giá trị cố định, random = ngẫu nhiên",
+      "value": "Giá trị cố định nếu mode = fixed",
+      "random_from": "Danh sách giá trị sẽ random (nếu mode = random). Để trống = random từ tất cả options"
+    },
+    "fields": {
+      "entry.667922728": {
+        "mode": "fixed",
+        "value": "Nam"
+      },
+      "entry.1830200648": {
+        "mode": "fixed",
+        "value": "Dưới 25 tuổi"
+      },
+      "entry.463079656": {
+        "mode": "fixed",
+        "value": "Dưới 10 triệu VNĐ"
+      },
+      "entry.2147235682": {
+        "mode": "random",
+        "random_from": [
+          "Dưới 1 năm",
+          "1 năm - dưới 5 năm"
+        ]
+      },
+      "entry.900694859": {
+        "mode": "fixed",
+        "value": "Dưới 100 triệu VNĐ"
+      },
+      "entry.956398727": {
+        "mode": "fixed",
+        "value": "Đại học"
+      },
+      "entry.959643901": {
+        "mode": "fixed",
+        "value": "Chưa"
+      },
+      "entry.1853307524": {
+        "mode": "fixed",
+        "value": "Rất ít"
+      },
+      "entry.1730727202": {
+        "mode": "random",
+        "random_from": [
+          "Độ chính xác của thông tin",
+          "Mức độ cá nhân hóa theo nhu cầu",
+          "Giảm rủi ro đầu tư",
+          "Tiết kiệm thời gian"
+        ]
+      },
+      "entry.1473697678": {
+        "mode": "random",
+        "random_from": [
+          "Khác biệt khá lớn",
+          "Khác biệt ít"
+        ]
+      },
+      "entry.85205205": {
+        "mode": "fixed",
+        "value": "Tự phân tích"
+      },
+      "entry.437673328": {
+        "mode": "random",
+        "random_from": [
+          "Có kinh nghiệm thực tế trong đầu tư",
+          "Trung thực và minh bạch",
+          "Phân tích và dự báo thị trường chính xác",
+          "Thái độ nhiệt tình, hỗ trợ tận tâm",
+          "Có chứng chỉ hành nghề hợp pháp"
+        ]
+      },
+      "entry.1369367013": {
+        "mode": "random",
+        "random_from": [
+          "2",
+          "4"
+        ]
+      },
+      "entry.1250875761": {
+        "mode": "fixed",
+        "value": "4"
+      },
+      "entry.1725380723": {
+        "mode": "random",
+        "random_from": [
+          "3",
+          "5"
+        ]
+      },
+      "entry.533221884": {
+        "mode": "fixed",
+        "value": "5"
+      },
+      "entry.588280240": {
+        "mode": "random",
+        "random_from": [
+          "2",
+          "4",
+          "5"
+        ]
+      },
+      "entry.1310733532": {
+        "mode": "fixed",
+        "value": "3"
+      },
+      "entry.693079597": {
+        "mode": "fixed",
+        "value": "3"
+      },
+      "entry.387038813": {
+        "mode": "fixed",
+        "value": "3"
+      },
+      "entry.1184420151": {
+        "mode": "random",
+        "random_from": [
+          "3",
+          "2"
+        ]
+      },
+      "entry.926559151": {
+        "mode": "fixed",
+        "value": "2"
+      },
+      "entry.475896920": {
+        "mode": "random",
+        "random_from": [
+          "3",
+          "4",
+          "5"
+        ]
+      },
+      "entry.1218092709": {
+        "mode": "random",
+        "random_from": [
+          "2",
+          "4"
+        ]
+      },
+      "entry.1133675037": {
+        "mode": "random",
+        "random_from": [
+          "3",
+          "2"
+        ]
+      },
+      "entry.1217710073": {
+        "mode": "fixed",
+        "value": "2"
+      },
+      "entry.87200056": {
+        "mode": "random",
+        "random_from": [
+          "3",
+          "4"
+        ]
+      },
+      "entry.1452021916": {
+        "mode": "random",
+        "random_from": [
+          "2",
+          "4"
+        ]
+      },
+      "entry.1695913103": {
+        "mode": "random",
+        "random_from": [
+          "2",
+          "4"
+        ]
+      },
+      "entry.709059272": {
+        "mode": "random",
+        "random_from": [
+          "3",
+          "5"
+        ]
+      },
+      "entry.1863484616": {
+        "mode": "fixed",
+        "value": "3"
+      },
+      "entry.1349689266": {
+        "mode": "fixed",
+        "value": "4"
+      },
+      "entry.1785431672": {
+        "mode": "random",
+        "random_from": [
+          "3",
+          "5"
+        ]
+      },
+      "entry.1765843847": {
+        "mode": "random",
+        "random_from": [
+          "5",
+          "3"
+        ]
+      },
+      "entry.719653091": {
+        "mode": "fixed",
+        "value": "4"
+      },
+      "entry.989721069": {
+        "mode": "random",
+        "random_from": [
+          "4",
+          "3"
+        ]
+      },
+      "entry.25071617": {
+        "mode": "random",
+        "random_from": [
+          "5",
+          "2",
+          "3"
+        ]
+      }
+    }
+  },
+  "custom_data": {
+    "comment": "Thêm dữ liệu tùy chỉnh cho từng entry_id ở đây (deprecated - dùng field_config thay thế)",
+    "example": {
+      "entry.123456789": "Giá trị tùy chỉnh"
+    }
+  },
+  "advanced": {
+    "use_realistic_data": true,
+    "validate_before_submit": true,
+    "log_submissions": true,
+    "log_file": "submissions.log"
+  }
+}
