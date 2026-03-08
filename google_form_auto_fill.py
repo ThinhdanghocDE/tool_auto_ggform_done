@@ -698,6 +698,71 @@ class GoogleFormAutoFill:
         
         return hidden_fields
     
+    def _validate_data(self, data: Dict, fields: Dict) -> Dict:
+        """
+        Validate và chuẩn hóa dữ liệu trước khi submit
+        Đảm bảo giá trị khớp với choices trong form
+        """
+        validated_data = {}
+        
+        for entry_id, value in data.items():
+            if entry_id not in fields:
+                print(f"⚠ Cảnh báo: Entry ID {entry_id} không có trong fields, vẫn sẽ gửi")
+                validated_data[entry_id] = value
+                continue
+            
+            field_info = fields[entry_id]
+            field_type = field_info.get('type', 'text')
+            choices = field_info.get('choices', [])
+            
+            # Với radio/dropdown/checkbox, kiểm tra giá trị có trong choices không
+            if field_type in ['radio', 'dropdown']:
+                if choices:
+                    # Tìm giá trị khớp (có thể có khoảng trắng hoặc case khác)
+                    value_str = str(value).strip()
+                    matched = False
+                    for choice in choices:
+                        if str(choice).strip() == value_str:
+                            validated_data[entry_id] = str(choice).strip()  # Dùng giá trị từ form
+                            matched = True
+                            break
+                    
+                    if not matched:
+                        print(f"⚠ Cảnh báo: Giá trị '{value}' không khớp với choices cho {entry_id}")
+                        print(f"  Choices có sẵn: {choices[:3]}...")
+                        # Vẫn gửi giá trị gốc
+                        validated_data[entry_id] = value_str
+                else:
+                    validated_data[entry_id] = str(value).strip()
+            
+            elif field_type == 'checkbox':
+                if isinstance(value, list):
+                    validated_list = []
+                    for val in value:
+                        val_str = str(val).strip()
+                        if choices:
+                            # Tìm giá trị khớp
+                            matched = False
+                            for choice in choices:
+                                if str(choice).strip() == val_str:
+                                    validated_list.append(str(choice).strip())
+                                    matched = True
+                                    break
+                            if not matched:
+                                print(f"⚠ Cảnh báo: Giá trị '{val}' không khớp với choices cho checkbox {entry_id}")
+                                validated_list.append(val_str)
+                        else:
+                            validated_list.append(val_str)
+                    validated_data[entry_id] = validated_list
+                else:
+                    validated_data[entry_id] = [str(value).strip()]
+            
+            else:
+                # Text, linear_scale, date, etc. - chỉ cần strip
+                validated_data[entry_id] = str(value).strip() if not isinstance(value, list) else value
+        
+        return validated_data
+    
     def submit_form(self, data: Dict, delay: float = 1.0) -> bool:
         """
         Submit form với dữ liệu đã cho
@@ -717,11 +782,17 @@ class GoogleFormAutoFill:
             if '/formResponse' not in viewform_url and '/viewform' not in viewform_url:
                 viewform_url = self.form_url
             
-            # Lấy HTML form để lấy hidden fields
+            # Lấy HTML form để lấy hidden fields và validate data
             try:
                 form_response = self.session.get(viewform_url)
                 hidden_fields = self._get_hidden_fields(form_response.text)
                 print(f"Debug: Đã lấy {len(hidden_fields)} hidden fields: {list(hidden_fields.keys())}")
+                
+                # Validate và chuẩn hóa dữ liệu
+                fields = self.get_form_fields()
+                if fields:
+                    data = self._validate_data(data, fields)
+                    print(f"Debug: Đã validate dữ liệu")
             except Exception as e:
                 print(f"Lưu ý: Không lấy được hidden fields: {e}")
                 hidden_fields = {
@@ -748,9 +819,14 @@ class GoogleFormAutoFill:
                 else:
                     submit_data_list.append((entry_id, str(value)))
             
-            # Debug: In ra một số thông tin
+            # Debug: In ra một số thông tin chi tiết
             entry_ids = [d[0] for d in submit_data_list if d[0].startswith('entry.')]
             print(f"Debug: Sẽ gửi {len(entry_ids)} entry IDs: {entry_ids[:5]}..." if len(entry_ids) > 5 else f"Debug: Sẽ gửi {len(entry_ids)} entry IDs: {entry_ids}")
+            
+            # Debug: In ra một vài mẫu dữ liệu để kiểm tra
+            print("Debug: Mẫu dữ liệu sẽ gửi (5 mẫu đầu):")
+            for i, (key, val) in enumerate(submit_data_list[:5]):
+                print(f"  {key} = {val}")
             
             # Set headers quan trọng để Google Forms chấp nhận request
             headers = {
@@ -775,6 +851,12 @@ class GoogleFormAutoFill:
             print(f"Debug: Status code = {response.status_code}")
             print(f"Debug: Response URL = {response.url[:200]}")
             
+            # In ra response content để debug (500 ký tự đầu)
+            response_preview = response.text[:1000]
+            print(f"Debug: Response preview (1000 ký tự đầu):")
+            print(response_preview)
+            print("="*50)
+            
             # Google Forms thành công sẽ redirect đến trang thank you
             if response.status_code in [200, 302]:
                 # Kiểm tra nội dung response
@@ -788,7 +870,9 @@ class GoogleFormAutoFill:
                     'thank you' in response_text,
                     'your response has been recorded' in response_text,
                     'phản hồi của bạn đã được ghi lại' in response_text,
-                    'response recorded' in response_text
+                    'response recorded' in response_text,
+                    'đã gửi' in response_text,
+                    'submitted' in response_text
                 ]
                 
                 if any(success_indicators):
@@ -801,23 +885,28 @@ class GoogleFormAutoFill:
                         'lỗi' in response_text,
                         'invalid' in response_text,
                         'không hợp lệ' in response_text,
-                        'required' in response_text and 'field' in response_text
+                        'required' in response_text and 'field' in response_text,
+                        'missing' in response_text,
+                        'thiếu' in response_text
                     ]
                     
                     if any(error_indicators):
                         print(f"✗ Submit thất bại - có lỗi trong response")
-                        print(f"  Response preview: {response.text[:500]}")
+                        # Tìm và in ra thông báo lỗi cụ thể
+                        error_lines = [line for line in response.text.split('\n') if any(err in line.lower() for err in ['error', 'lỗi', 'invalid', 'required', 'missing'])]
+                        if error_lines:
+                            print(f"  Lỗi phát hiện: {error_lines[:3]}")
                     else:
-                        # Có thể thành công nhưng không có dấu hiệu rõ ràng
-                        # Kiểm tra xem URL có chứa formResponse không
-                        if 'formresponse' in response.url.lower():
-                            print(f"✓ Submit có thể thành công (URL chứa formResponse)")
+                        # Kiểm tra xem có phải là trang formResponse không (có thể thành công nhưng không có thông báo)
+                        if 'formresponse' in response.url.lower() and len(response.text) < 5000:
+                            # Response ngắn thường là thành công
+                            print(f"⚠ Submit có thể thành công (URL formResponse, response ngắn)")
+                            print(f"  Lưu ý: Kiểm tra trong Google Forms để xác nhận dữ liệu đã được lưu")
                             return True
                         else:
-                            print(f"⚠ Submit có thể thành công nhưng không chắc chắn")
-                            print(f"  Response preview: {response.text[:500]}")
-                            # Vẫn return True vì status code là 200/302
-                            return True
+                            print(f"⚠ Không chắc chắn - cần kiểm tra trong Google Forms")
+                            print(f"  Response length: {len(response.text)}")
+                            return False
             
             print(f"✗ Submit thất bại. Status: {response.status_code}")
             print(f"  Response: {response.text[:500]}")

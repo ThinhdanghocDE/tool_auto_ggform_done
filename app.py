@@ -430,6 +430,20 @@ with tab4:
     if 'form_filler' not in st.session_state:
         st.warning("Vui lòng lấy danh sách câu hỏi trước (tab 'Danh sách câu hỏi')")
     else:
+        # Chọn phương pháp submit
+        submit_method = st.radio(
+            "Phương pháp submit:",
+            ["API (Nhanh nhưng có thể không hoạt động)", "Selenium (Chậm hơn nhưng giả lập người dùng thật)"],
+            help="Selenium giả lập người dùng thật, mở browser và điền form như bình thường"
+        )
+        
+        use_selenium = "Selenium" in submit_method
+        
+        if use_selenium:
+            st.info("⚠️ Selenium sẽ mở browser để điền form. Đảm bảo đã cài đặt ChromeDriver.")
+            headless_mode = st.checkbox("Chạy ở chế độ ẩn (headless)", value=False, 
+                                       help="Nếu bỏ chọn, bạn sẽ thấy browser mở ra")
+        
         col1, col2 = st.columns(2)
         
         with col1:
@@ -442,34 +456,90 @@ with tab4:
             status_text = st.empty()
             results = []
             
-            for i in range(num_submissions):
+            if use_selenium:
+                # Sử dụng Selenium
                 try:
-                    # Tạo dữ liệu mới cho mỗi lần submit
-                    fields = st.session_state['form_filler'].get_form_fields()
-                    field_config = st.session_state.get('field_config', {'fields': {}})
-                    data = st.session_state['form_filler'].generate_random_data(fields, field_config=field_config)
+                    from google_form_selenium import GoogleFormAutoFillSelenium
                     
-                    # Submit
-                    success = st.session_state['form_filler'].submit_form(data, delay=delay)
+                    selenium_filler = GoogleFormAutoFillSelenium(
+                        st.session_state['form_url'],
+                        headless=headless_mode
+                    )
                     
-                    results.append({
-                        'submission': i + 1,
-                        'success': success,
-                        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-                    })
-                    
-                    # Update progress
-                    progress = (i + 1) / num_submissions
-                    progress_bar.progress(progress)
-                    status_text.text(f"Đã submit: {i + 1}/{num_submissions} - {'Thành công' if success else 'Thất bại'}")
-                    
+                    try:
+                        for i in range(num_submissions):
+                            try:
+                                # Tạo dữ liệu mới cho mỗi lần submit
+                                fields = st.session_state['form_filler'].get_form_fields()
+                                field_config = st.session_state.get('field_config', {'fields': {}})
+                                data = st.session_state['form_filler'].generate_random_data(fields, field_config=field_config)
+                                
+                                # Submit với Selenium
+                                success = selenium_filler.submit_form(
+                                    data, 
+                                    questions=st.session_state.get('questions'),
+                                    delay=0.5
+                                )
+                                
+                                results.append({
+                                    'submission': i + 1,
+                                    'success': success,
+                                    'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+                                })
+                                
+                                # Update progress
+                                progress = (i + 1) / num_submissions
+                                progress_bar.progress(progress)
+                                status_text.text(f"Đã submit: {i + 1}/{num_submissions} - {'Thành công' if success else 'Thất bại'}")
+                                
+                                # Delay giữa các lần submit
+                                if i < num_submissions - 1:
+                                    time.sleep(delay)
+                                    
+                            except Exception as e:
+                                results.append({
+                                    'submission': i + 1,
+                                    'success': False,
+                                    'error': str(e),
+                                    'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+                                })
+                    finally:
+                        selenium_filler.close()
+                        
+                except ImportError:
+                    st.error("Chưa cài đặt Selenium. Chạy: pip install selenium")
                 except Exception as e:
-                    results.append({
-                        'submission': i + 1,
-                        'success': False,
-                        'error': str(e),
-                        'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-                    })
+                    st.error(f"Lỗi khi khởi tạo Selenium: {e}")
+            else:
+                # Sử dụng API
+                for i in range(num_submissions):
+                    try:
+                        # Tạo dữ liệu mới cho mỗi lần submit
+                        fields = st.session_state['form_filler'].get_form_fields()
+                        field_config = st.session_state.get('field_config', {'fields': {}})
+                        data = st.session_state['form_filler'].generate_random_data(fields, field_config=field_config)
+                        
+                        # Submit
+                        success = st.session_state['form_filler'].submit_form(data, delay=delay)
+                        
+                        results.append({
+                            'submission': i + 1,
+                            'success': success,
+                            'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+                        })
+                        
+                        # Update progress
+                        progress = (i + 1) / num_submissions
+                        progress_bar.progress(progress)
+                        status_text.text(f"Đã submit: {i + 1}/{num_submissions} - {'Thành công' if success else 'Thất bại'}")
+                        
+                    except Exception as e:
+                        results.append({
+                            'submission': i + 1,
+                            'success': False,
+                            'error': str(e),
+                            'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+                        })
             
             # Lưu kết quả
             st.session_state['submit_results'] = results
