@@ -624,6 +624,7 @@ class GoogleFormAutoFill:
         """
         from bs4 import BeautifulSoup
         import re
+        import json
         
         hidden_fields = {}
         
@@ -650,9 +651,50 @@ class GoogleFormAutoFill:
                 fbzx_match = re.search(r'fbzx=([^&"\']+)', action)
                 if fbzx_match:
                     hidden_fields['fbzx'] = fbzx_match.group(1)
+            
+            # Tìm pageHistory từ JavaScript hoặc form
+            # Thử nhiều pattern khác nhau
+            page_history_patterns = [
+                r'pageHistory["\']?\s*[:=]\s*["\']?([^"\']+)',
+                r'pageHistory["\']?\s*:\s*\[([^\]]+)\]',
+                r'"pageHistory"\s*:\s*"([^"]+)"',
+            ]
+            for pattern in page_history_patterns:
+                page_history_match = re.search(pattern, html_content)
+                if page_history_match:
+                    hidden_fields['pageHistory'] = page_history_match.group(1)
+                    break
+            
+            # Nếu không tìm thấy, dùng mặc định cho form 1 trang
+            if 'pageHistory' not in hidden_fields:
+                hidden_fields['pageHistory'] = '0,1'
+            
+            # Tìm fvv (form validation value) - thường là 1
+            fvv_patterns = [
+                r'fvv["\']?\s*[:=]\s*["\']?([^"\']+)',
+                r'"fvv"\s*:\s*(\d+)',
+            ]
+            for pattern in fvv_patterns:
+                fvv_match = re.search(pattern, html_content)
+                if fvv_match:
+                    hidden_fields['fvv'] = fvv_match.group(1)
+                    break
+            
+            # Nếu không tìm thấy, dùng mặc định
+            if 'fvv' not in hidden_fields:
+                hidden_fields['fvv'] = '1'
+            
+            # partialResponse - thường là []
+            hidden_fields['partialResponse'] = '[]'
         
         except Exception as e:
             print(f"Lưu ý: Không lấy được hidden fields: {e}")
+            # Đặt giá trị mặc định nếu có lỗi
+            hidden_fields = {
+                'pageHistory': '0,1',
+                'fvv': '1',
+                'partialResponse': '[]'
+            }
         
         return hidden_fields
     
@@ -670,18 +712,29 @@ class GoogleFormAutoFill:
         time.sleep(delay)
         
         try:
+            # Lấy viewform URL để lấy hidden fields
+            viewform_url = self.form_url.replace('/formResponse', '/viewform')
+            if '/formResponse' not in viewform_url and '/viewform' not in viewform_url:
+                viewform_url = self.form_url
+            
             # Lấy HTML form để lấy hidden fields
             try:
-                form_response = self.session.get(self.form_url.replace('/formResponse', '/viewform'))
+                form_response = self.session.get(viewform_url)
                 hidden_fields = self._get_hidden_fields(form_response.text)
-            except:
-                hidden_fields = {}
+                print(f"Debug: Đã lấy {len(hidden_fields)} hidden fields: {list(hidden_fields.keys())}")
+            except Exception as e:
+                print(f"Lưu ý: Không lấy được hidden fields: {e}")
+                hidden_fields = {
+                    'pageHistory': '0,1',
+                    'fvv': '1',
+                    'partialResponse': '[]'
+                }
             
             # Xử lý checkbox - Google Forms cần gửi nhiều giá trị cùng key
             # Sử dụng list of tuples để requests có thể gửi nhiều giá trị cùng key
             submit_data_list = []
             
-            # Thêm hidden fields trước
+            # Thêm hidden fields trước (QUAN TRỌNG!)
             for key, value in hidden_fields.items():
                 if value:  # Chỉ thêm nếu có giá trị
                     submit_data_list.append((key, str(value)))
@@ -695,34 +748,85 @@ class GoogleFormAutoFill:
                 else:
                     submit_data_list.append((entry_id, str(value)))
             
-            # Thêm các tham số cần thiết cho Google Forms
-            params = {
-                'submit': 'Submit'
-            }
+            # Debug: In ra một số thông tin
+            entry_ids = [d[0] for d in submit_data_list if d[0].startswith('entry.')]
+            print(f"Debug: Sẽ gửi {len(entry_ids)} entry IDs: {entry_ids[:5]}..." if len(entry_ids) > 5 else f"Debug: Sẽ gửi {len(entry_ids)} entry IDs: {entry_ids}")
             
-            # Gửi với list of tuples - requests sẽ tự xử lý nhiều giá trị cùng key
+            # Set headers quan trọng để Google Forms chấp nhận request
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': viewform_url,
+                'Origin': 'https://docs.google.com',
+            }
+            # Cập nhật User-Agent trong headers nếu cần
+            if 'User-Agent' not in headers:
+                headers['User-Agent'] = self.session.headers.get('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            
+            # Gửi POST request với headers đầy đủ
             response = self.session.post(
                 self.submit_url,
                 data=submit_data_list,
-                params=params,
+                headers=headers,
                 allow_redirects=True,
                 timeout=10
             )
             
-            # Google Forms trả về 200 hoặc redirect nếu submit thành công
-            # Kiểm tra nội dung response để xác nhận
+            # Kiểm tra response kỹ hơn
+            print(f"Debug: Status code = {response.status_code}")
+            print(f"Debug: Response URL = {response.url[:200]}")
+            
+            # Google Forms thành công sẽ redirect đến trang thank you
             if response.status_code in [200, 302]:
-                # Kiểm tra xem có thông báo thành công không
-                if 'formResponse' in response.url or 'thankyou' in response.url.lower() or response.status_code == 200:
+                # Kiểm tra nội dung response
+                response_text = response.text.lower()
+                
+                # Các dấu hiệu thành công
+                success_indicators = [
+                    'thankyou' in response.url.lower(),
+                    'formresponse' in response.url.lower(),
+                    'cảm ơn' in response_text,
+                    'thank you' in response_text,
+                    'your response has been recorded' in response_text,
+                    'phản hồi của bạn đã được ghi lại' in response_text,
+                    'response recorded' in response_text
+                ]
+                
+                if any(success_indicators):
                     print(f"✓ Submit thành công! Status: {response.status_code}")
                     return True
+                else:
+                    # Kiểm tra xem có lỗi không
+                    error_indicators = [
+                        'error' in response_text,
+                        'lỗi' in response_text,
+                        'invalid' in response_text,
+                        'không hợp lệ' in response_text,
+                        'required' in response_text and 'field' in response_text
+                    ]
+                    
+                    if any(error_indicators):
+                        print(f"✗ Submit thất bại - có lỗi trong response")
+                        print(f"  Response preview: {response.text[:500]}")
+                    else:
+                        # Có thể thành công nhưng không có dấu hiệu rõ ràng
+                        # Kiểm tra xem URL có chứa formResponse không
+                        if 'formresponse' in response.url.lower():
+                            print(f"✓ Submit có thể thành công (URL chứa formResponse)")
+                            return True
+                        else:
+                            print(f"⚠ Submit có thể thành công nhưng không chắc chắn")
+                            print(f"  Response preview: {response.text[:500]}")
+                            # Vẫn return True vì status code là 200/302
+                            return True
             
             print(f"✗ Submit thất bại. Status: {response.status_code}")
-            print(f"  URL response: {response.url[:100]}...")
+            print(f"  Response: {response.text[:500]}")
             return False
                 
         except Exception as e:
             print(f"✗ Lỗi khi submit: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def auto_fill_and_submit(self, num_submissions: int = 1, custom_data: Optional[Dict] = None, delay: float = 2.0, field_config: Optional[Dict] = None):
